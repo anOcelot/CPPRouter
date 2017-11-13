@@ -325,8 +325,8 @@ public:
 
                             int forwardFRep = send(targetInt, &forForBuff, ipHFL+14, 0);
                             if (forwardFRep < 0) { perror("Send ArpReq"); }
-
-
+			    //char icmp[100];
+			    //buildIcmp(buf, icmp);
                         }
 
                     }
@@ -351,6 +351,9 @@ public:
                     macMap.insert(std::pair<u_int8_t * ,u_int8_t *>(arpH->arp_sha, arpH->arp_spa));			 
                     int sent = send(packet_socket, &replyBuffer, 42, 0);
                     if (sent < 0) { perror("SEND"); }
+
+
+			
                 }
             }
             //Handle IP
@@ -414,12 +417,33 @@ public:
                     }
 
                 }
+		
 
-                    //THIS PACKET NOT FOR ME
+		//THIS PACKET NOT FOR ME
                 else {
+		    
 
-
+		    char icmp[78];
+		    memcpy(icmp, buf, 50);
+		    memcpy(icmp+50, buf+14, 28);
+		    struct ether_header *errorEther = (struct ether_header *)(icmp);
+		    struct ip *errorIp = (struct ip *)(icmp+14);
+		    struct icmphdr *errorIcmp = (struct icmphdr *) (icmp + 34);                    
                     //check table for next hop
+		    errorIp->ip_dst = errorIp->ip_src;
+		    errorIp->ip_src = myIP->sin_addr;
+		    errorIp->ip_hl = 5;
+		    errorIp->ip_v = 4;
+	            errorIp->ip_tos = 0;
+		    errorIp->ip_len = htons(64);
+		    errorIp->ip_off = 0;
+		    errorIp->ip_ttl = 64;
+		    errorIp->ip_p = 1;
+		    errorIp->ip_sum = 0;
+		    errorIp->ip_sum = checksum((unsigned short *) (icmp+14), sizeof(struct ip));
+		    errorIcmp->type = 3;
+		    errorIcmp->code = 0;
+		    errorIcmp->checksum = checksum((unsigned short *) (icmp + 34), (sizeof(struct icmphdr) + 28));
                     unsigned char *nextMac;
                     int gotMac = 0;
                     for (auto &x:macMap) {
@@ -645,6 +669,13 @@ public:
 
 
     }
+
+	void buildIcmp(char * packet, char * icmp){
+		
+		
+		memcpy(&icmp, &packet, 24);
+
+	}
 };
 
 int main() {
